@@ -4,7 +4,7 @@
 ![Docker Image](https://github.com/Hamster-Prime/DNS_automatic_traffic_splitting/actions/workflows/docker.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-这是一个高性能、支持多协议接入、自动根据Geo分流国内外的 DNS 代理服务，使用 Go 语言编写。
+这是一个高性能、支持多协议接入、自动根据 Geo 分流国内外的 DNS 代理服务，使用 Go 语言编写。内置现代化 Web 管理面板，支持可视化配置、实时日志监控和性能测试。
 
 ---
 
@@ -20,6 +20,11 @@ DoT/DoQ: `dns-test.11451453.xyz`
     *   DNS over TLS (DoT, :853)
     *   DNS over QUIC (DoQ, :853)
     *   DNS over HTTPS (DoH, :443, 支持 HTTP/2 和 HTTP/3)
+*   **现代化 Web 面板**:
+    *   **仪表盘**: 实时查看查询总量、流量分流比例、活跃客户端 TOP5、热点域名 TOP5。
+    *   **实时日志**: 支持全字段（时间、客户端、域名、耗时等）排序和全文搜索，支持持久化存储与自动清理。
+    *   **可视化配置**: 轻松管理监听端口、上游服务器（支持一键连通性测试）、Geo 数据源等。
+    *   **安全鉴权**: 支持配置用户名/密码登录保护，游客模式下仅允许查看。
 *   **智能分流**: 
     *   基于 `GeoIP.dat` 和 `GeoSite.dat` 自动区分中国大陆和海外域名。
     *   支持自定义 Hosts 文件 (`hosts.txt`)。
@@ -27,7 +32,8 @@ DoT/DoQ: `dns-test.11451453.xyz`
     *   **ECS 支持**: 自动为国内/海外上游附加预配置的 ECS IP，优化 CDN 解析。
 *   **高性能上游客户端**: 
     *   **并发竞速**: 海外查询支持并发向多个上游发起请求，最快者胜。
-    *   **Bootstrap**: 自动使用 Bootstrap DNS 解析上游 DoH/DoT 域名。
+    *   **智能纠错**: 面板可区分主动取消的请求与真实网络错误，精准定位上游问题。
+    *   **自动格式化**: 填写上游地址时无需记忆繁琐前缀（如自动补充 `https://`, `:853` 等）。
     *   **连接复用 (RFC 7766)**: 支持 TCP/DoT 连接复用 (Pipelining)。
     *   **HTTP/3**: DoH 上游支持 HTTP/3 (QUIC)。
 *   **自动证书管理**: 
@@ -118,9 +124,23 @@ listen:
   dns_udp: ":53"
   doh: ":443"
 
+# 启用 WebUI 鉴权（推荐）
+web_ui:
+  enabled: true
+  address: ":8080"
+  username: "admin"      # 设置后开启鉴权
+  password: "password"   # 游客模式下仅能查看无法修改
+
+query_log:
+  enabled: true
+  save_to_file: true     # 开启持久化存储
+  file: "query.log"
+  max_history: 5000      # 内存/日志保留条数
+
 upstreams:
   overseas:
-    - address: "https://1.1.1.1/dns-query"
+    # 支持简写，系统自动补全协议前缀
+    - address: "dns.google" 
       protocol: "doh"
       http3: true
 ```

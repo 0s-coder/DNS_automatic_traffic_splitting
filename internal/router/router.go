@@ -6,9 +6,11 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 
 	"doh-autoproxy/internal/client"
 	"doh-autoproxy/internal/config"
+	"doh-autoproxy/internal/querylog"
 	"doh-autoproxy/internal/resolver"
 
 	"github.com/miekg/dns"
@@ -17,14 +19,19 @@ import (
 type Router struct {
 	config          *config.Config
 	geo             *GeoDataManager
+	logger          *querylog.QueryLogger
 	cnClients       []client.DNSClient
 	overseasClients []client.DNSClient
+
+	cnStats       []*client.StatsClient
+	overseasStats []*client.StatsClient
 }
 
-func NewRouter(cfg *config.Config, geoManager *GeoDataManager) *Router {
+func NewRouter(cfg *config.Config, geoManager *GeoDataManager, logger *querylog.QueryLogger) *Router {
 	r := &Router{
 		config: cfg,
 		geo:    geoManager,
+		logger: logger,
 	}
 
 	bootstrapper := resolver.NewBootstrapper(cfg.BootstrapDNS)
@@ -35,7 +42,9 @@ func NewRouter(cfg *config.Config, geoManager *GeoDataManager) *Router {
 			log.Printf("Failed to initialize CN upstream %s: %v", upstreamCfg.Address, err)
 			continue
 		}
-		r.cnClients = append(r.cnClients, c)
+		sc := client.NewStatsClient(c, upstreamCfg.Address, upstreamCfg.Protocol, "CN")
+		r.cnClients = append(r.cnClients, sc)
+		r.cnStats = append(r.cnStats, sc)
 	}
 
 	for _, upstreamCfg := range cfg.Upstreams.Overseas {
@@ -44,19 +53,78 @@ func NewRouter(cfg *config.Config, geoManager *GeoDataManager) *Router {
 			log.Printf("Failed to initialize Overseas upstream %s: %v", upstreamCfg.Address, err)
 			continue
 		}
-		r.overseasClients = append(r.overseasClients, c)
+		sc := client.NewStatsClient(c, upstreamCfg.Address, upstreamCfg.Protocol, "Overseas")
+		r.overseasClients = append(r.overseasClients, sc)
+		r.overseasStats = append(r.overseasStats, sc)
 	}
 
 	return r
 }
 
-func (r *Router) Route(ctx context.Context, req *dns.Msg) (*dns.Msg, error) {
+func (r *Router) GetUpstreamStats() []interface{} {
+	var stats []interface{}
+	for _, s := range r.cnStats {
+		stats = append(stats, s.GetStats())
+	}
+	for _, s := range r.overseasStats {
+		stats = append(stats, s.GetStats())
+	}
+	return stats
+}
+
+func (r *Router) Route(ctx context.Context, req *dns.Msg, clientIP string) (*dns.Msg, error) {
+	start := time.Now()
+	if len(req.Question) == 0 {
+		return nil, fmt.Errorf("no question")
+	}
+
+	resp, upstream, err := r.routeInternal(ctx, req)
+
+	duration := time.Since(start).Milliseconds()
+
+	qName := req.Question[0].Name
+	qType := dns.Type(req.Question[0].Qtype).String()
+
+	status := "ERROR"
+	answer := ""
+
+	if err == nil && resp != nil {
+		status = dns.RcodeToString[resp.Rcode]
+		if len(resp.Answer) > 0 {
+			parts := strings.Fields(resp.Answer[0].String())
+			if len(parts) > 4 {
+				answer = strings.Join(parts[4:], " ")
+			} else {
+				answer = resp.Answer[0].String()
+			}
+			if len(resp.Answer) > 1 {
+				answer += fmt.Sprintf(" (+%d more)", len(resp.Answer)-1)
+			}
+		}
+	}
+
+	if r.logger != nil {
+		r.logger.AddLog(&querylog.LogEntry{
+			ClientIP:   clientIP,
+			Domain:     qName,
+			Type:       qType,
+			Upstream:   upstream,
+			Answer:     answer,
+			DurationMs: duration,
+			Status:     status,
+		})
+	}
+
+	return resp, err
+}
+
+func (r *Router) routeInternal(ctx context.Context, req *dns.Msg) (*dns.Msg, string, error) {
 	qName := strings.ToLower(strings.TrimSuffix(req.Question[0].Name, "."))
 
 	if ipStr, ok := r.config.Hosts[qName]; ok {
 		ip := net.ParseIP(ipStr)
 		if ip == nil {
-			return nil, fmt.Errorf("自定义Hosts中存在无效IP地址: %s for %s", ipStr, qName)
+			return nil, "Hosts", fmt.Errorf("自定义Hosts中存在无效IP地址: %s for %s", ipStr, qName)
 		}
 
 		m := new(dns.Msg)
@@ -73,32 +141,36 @@ func (r *Router) Route(ctx context.Context, req *dns.Msg) (*dns.Msg, error) {
 			rrHeader.Rrtype = dns.TypeAAAA
 			m.Answer = append(m.Answer, &dns.AAAA{Hdr: rrHeader, AAAA: ip})
 		}
-		return m, nil
+		return m, "Hosts", nil
 	}
 
 	if rule, ok := r.config.Rules[qName]; ok {
 		switch strings.ToLower(rule) {
 		case "cn":
-			return client.RaceResolve(ctx, req, r.cnClients)
+			resp, err := client.RaceResolve(ctx, req, r.cnClients)
+			return resp, "Rule(CN)", err
 		case "overseas":
-			return client.RaceResolve(ctx, req, r.overseasClients)
+			resp, err := client.RaceResolve(ctx, req, r.overseasClients)
+			return resp, "Rule(Overseas)", err
 		default:
-			return nil, fmt.Errorf("自定义规则中存在未知路由目标: %s for %s", rule, qName)
+			return nil, "Rule(Unknown)", fmt.Errorf("自定义规则中存在未知路由目标: %s for %s", rule, qName)
 		}
 	}
 
 	if geoSiteRule := r.geo.LookupGeoSite(qName); geoSiteRule != "" {
 		switch strings.ToLower(geoSiteRule) {
 		case "cn":
-			return client.RaceResolve(ctx, req, r.cnClients)
+			resp, err := client.RaceResolve(ctx, req, r.cnClients)
+			return resp, "GeoSite(CN)", err
 		default:
-			return client.RaceResolve(ctx, req, r.overseasClients)
+			resp, err := client.RaceResolve(ctx, req, r.overseasClients)
+			return resp, "GeoSite(Overseas)", err
 		}
 	}
 
 	resp, err := client.RaceResolve(ctx, req, r.overseasClients)
 	if err != nil {
-		return nil, fmt.Errorf("GeoIP分流时首次海外解析失败: %w", err)
+		return nil, "GeoIP(Fail)", fmt.Errorf("GeoIP分流时首次海外解析失败: %w", err)
 	}
 
 	var resolvedIP net.IP
@@ -114,8 +186,9 @@ func (r *Router) Route(ctx context.Context, req *dns.Msg) (*dns.Msg, error) {
 	}
 
 	if resolvedIP != nil && r.geo.IsCNIP(resolvedIP) {
-		return client.RaceResolve(ctx, req, r.cnClients)
+		resp, err := client.RaceResolve(ctx, req, r.cnClients)
+		return resp, "GeoIP(CN)", err
 	}
 
-	return resp, nil
+	return resp, "GeoIP(Overseas)", nil
 }

@@ -11,49 +11,67 @@ import (
 )
 
 type Config struct {
-	Listen       ListenConfig      `yaml:"listen"`
-	BootstrapDNS []string          `yaml:"bootstrap_dns"`
-	Upstreams    UpstreamsConfig   `yaml:"upstreams"`
-	Hosts        map[string]string `yaml:"-"`
-	Rules        map[string]string `yaml:"-"`
-	GeoData      GeoDataConfig     `yaml:"geo_data"`
-	AutoCert     AutoCertConfig    `yaml:"auto_cert"`
+	Listen       ListenConfig      `yaml:"listen" json:"listen"`
+	BootstrapDNS []string          `yaml:"bootstrap_dns" json:"bootstrap_dns"`
+	Upstreams    UpstreamsConfig   `yaml:"upstreams" json:"upstreams"`
+	Hosts        map[string]string `yaml:"-" json:"-"`
+	Rules        map[string]string `yaml:"-" json:"-"`
+	GeoData      GeoDataConfig     `yaml:"geo_data" json:"geo_data"`
+	AutoCert     AutoCertConfig    `yaml:"auto_cert" json:"auto_cert"`
+	WebUI        WebUIConfig       `yaml:"web_ui" json:"web_ui"`
+	QueryLog     QueryLogConfig    `yaml:"query_log" json:"query_log"`
+}
+
+type QueryLogConfig struct {
+	Enabled    bool   `yaml:"enabled" json:"enabled"`
+	File       string `yaml:"file" json:"file"`
+	MaxHistory int    `yaml:"max_history" json:"max_history"`
+	SaveToFile bool   `yaml:"save_to_file" json:"save_to_file"`
+}
+
+type WebUIConfig struct {
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
+	Address  string `yaml:"address" json:"address"`
+	Username string `yaml:"username" json:"username"`
+	Password string `yaml:"password" json:"password"`
+	CertFile string `yaml:"cert_file" json:"cert_file"`
+	KeyFile  string `yaml:"key_file" json:"key_file"`
 }
 
 type AutoCertConfig struct {
-	Enabled bool     `yaml:"enabled"`
-	Email   string   `yaml:"email"`
-	Domains []string `yaml:"domains"`
-	CertDir string   `yaml:"cert_dir"`
+	Enabled bool     `yaml:"enabled" json:"enabled"`
+	Email   string   `yaml:"email" json:"email"`
+	Domains []string `yaml:"domains" json:"domains"`
+	CertDir string   `yaml:"cert_dir" json:"cert_dir"`
 }
 
 type ListenConfig struct {
-	DNSUDP string `yaml:"dns_udp"`
-	DNSTCP string `yaml:"dns_tcp"`
-	DOH    string `yaml:"doh"`
-	DOT    string `yaml:"dot"`
-	DOQ    string `yaml:"doq"`
+	DNSUDP string `yaml:"dns_udp" json:"dns_udp"`
+	DNSTCP string `yaml:"dns_tcp" json:"dns_tcp"`
+	DOH    string `yaml:"doh" json:"doh"`
+	DOT    string `yaml:"dot" json:"dot"`
+	DOQ    string `yaml:"doq" json:"doq"`
 }
 
 type UpstreamsConfig struct {
-	CN       []UpstreamServer `yaml:"cn"`
-	Overseas []UpstreamServer `yaml:"overseas"`
+	CN       []UpstreamServer `yaml:"cn" json:"cn"`
+	Overseas []UpstreamServer `yaml:"overseas" json:"overseas"`
 }
 
 type UpstreamServer struct {
-	Address            string `yaml:"address"`
-	Protocol           string `yaml:"protocol"`
-	ECSIP              string `yaml:"ecs_ip"`
-	EnablePipeline     bool   `yaml:"pipeline"`
-	EnableH3           bool   `yaml:"http3"`
-	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	Address            string `yaml:"address" json:"address"`
+	Protocol           string `yaml:"protocol" json:"protocol"`
+	ECSIP              string `yaml:"ecs_ip" json:"ecs_ip"`
+	EnablePipeline     bool   `yaml:"pipeline" json:"pipeline"`
+	EnableH3           bool   `yaml:"http3" json:"http3"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify" json:"insecure_skip_verify"`
 }
 
 type GeoDataConfig struct {
-	GeoIPDat           string `yaml:"geoip_dat"`
-	GeoSiteDat         string `yaml:"geosite_dat"`
-	GeoIPDownloadURL   string `yaml:"geoip_download_url"`
-	GeoSiteDownloadURL string `yaml:"geosite_download_url"`
+	GeoIPDat           string `yaml:"geoip_dat" json:"geoip_dat"`
+	GeoSiteDat         string `yaml:"geosite_dat" json:"geosite_dat"`
+	GeoIPDownloadURL   string `yaml:"geoip_download_url" json:"geoip_download_url"`
+	GeoSiteDownloadURL string `yaml:"geosite_download_url" json:"geosite_download_url"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -67,6 +85,19 @@ func LoadConfig(configPath string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("无法解析配置文件 %s: %w", configPath, err)
 	}
+
+	cfg.QueryLog.Enabled = true
+
+	normalizePort := func(p *string) {
+		if *p != "" && !strings.Contains(*p, ":") {
+			*p = ":" + *p
+		}
+	}
+	normalizePort(&cfg.Listen.DNSUDP)
+	normalizePort(&cfg.Listen.DNSTCP)
+	normalizePort(&cfg.Listen.DOH)
+	normalizePort(&cfg.Listen.DOT)
+	normalizePort(&cfg.Listen.DOQ)
 
 	cfg.Hosts = make(map[string]string)
 	cfg.Rules = make(map[string]string)
@@ -84,6 +115,28 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func (c *Config) Save(configPath string) error {
+	normalizePort := func(p *string) {
+		if *p != "" && !strings.Contains(*p, ":") {
+			*p = ":" + *p
+		}
+	}
+	normalizePort(&c.Listen.DNSUDP)
+	normalizePort(&c.Listen.DNSTCP)
+	normalizePort(&c.Listen.DOH)
+	normalizePort(&c.Listen.DOT)
+	normalizePort(&c.Listen.DOQ)
+
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("无法序列化配置: %w", err)
+	}
+	if err := ioutil.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("无法写入配置文件 %s: %w", configPath, err)
+	}
+	return nil
 }
 
 func loadHostsFile(path string, hosts map[string]string) error {

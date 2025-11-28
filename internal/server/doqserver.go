@@ -19,10 +19,11 @@ import (
 )
 
 type DoQServer struct {
-	addr   string
-	router *router.Router
-	cfg    *config.Config
-	cm     *util.CertManager
+	addr     string
+	router   *router.Router
+	cfg      *config.Config
+	cm       *util.CertManager
+	listener *quic.Listener
 }
 
 func NewDoQServer(cfg *config.Config, r *router.Router, cm *util.CertManager) *DoQServer {
@@ -66,17 +67,26 @@ func (s *DoQServer) Start() {
 			log.Printf("无法启动DoQ服务器: %v", err)
 			return
 		}
-		defer listener.Close()
+		s.listener = listener
 
 		for {
 			conn, err := listener.Accept(context.Background())
 			if err != nil {
-				log.Printf("接受QUIC连接失败: %v", err)
-				continue
+				if err != quic.ErrServerClosed {
+					log.Printf("接受QUIC连接失败: %v", err)
+				}
+				return
 			}
 			go s.handleQuicConnection(conn)
 		}
 	}()
+}
+
+func (s *DoQServer) Stop() error {
+	if s.listener != nil {
+		return s.listener.Close()
+	}
+	return nil
 }
 
 func (s *DoQServer) handleQuicConnection(conn *quic.Conn) {
@@ -123,12 +133,13 @@ func (s *DoQServer) handleQuicStream(stream *quic.Stream, remoteAddr net.Addr) {
 	}
 
 	qName := strings.ToLower(strings.TrimSuffix(req.Question[0].Name, "."))
-	log.Printf("Received DoQ query for %s (Type: %s, From: %s)", qName, dns.Type(req.Question[0].Qtype).String(), remoteAddr.String())
+
+	clientIP, _, _ := net.SplitHostPort(remoteAddr.String())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := s.router.Route(ctx, req)
+	resp, err := s.router.Route(ctx, req, clientIP)
 	if err != nil {
 		log.Printf("DoQ: Error routing DNS query for %s: %v", qName, err)
 		resp = new(dns.Msg)

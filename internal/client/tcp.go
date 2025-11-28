@@ -108,10 +108,16 @@ func (c *TCPClient) dial(ctx context.Context) error {
 }
 
 func (c *TCPClient) resolveAddr(ctx context.Context) (string, error) {
-	host, port, err := net.SplitHostPort(c.cfg.Address)
+	rawAddr := c.cfg.Address
+	host, port, err := net.SplitHostPort(rawAddr)
 	if err != nil {
-		return "", fmt.Errorf("invalid address %s: %w", c.cfg.Address, err)
+		rawAddr = net.JoinHostPort(rawAddr, "53")
+		host, port, err = net.SplitHostPort(rawAddr)
+		if err != nil {
+			return "", fmt.Errorf("invalid address %s: %w", c.cfg.Address, err)
+		}
 	}
+
 	ip, err := c.bootstrapper.LookupIP(ctx, host)
 	if err != nil {
 		return "", fmt.Errorf("bootstrap failed: %w", err)

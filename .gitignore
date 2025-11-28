@@ -3,3 +3,5 @@ build.ps1
 config.yaml
 hosts.txt
 rule.txt
+CHANGELOG.md
+ns.md

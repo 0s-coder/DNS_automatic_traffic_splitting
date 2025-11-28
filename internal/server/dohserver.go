@@ -109,6 +109,23 @@ func (s *DoHServer) Start() {
 	}()
 }
 
+func (s *DoHServer) Stop() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if s.http2Server != nil {
+		if err := s.http2Server.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down DoH HTTP/2 server: %v", err)
+		}
+	}
+	if s.http3Server != nil {
+		if err := s.http3Server.Close(); err != nil {
+			log.Printf("Error closing DoH HTTP/3 server: %v", err)
+		}
+	}
+	return nil
+}
+
 type DoHRequestHandler struct {
 	router *router.Router
 }
@@ -161,12 +178,19 @@ func (h *DoHRequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	qName := strings.ToLower(strings.TrimSuffix(req.Question[0].Name, "."))
-	log.Printf("Received DoH query for %s (Type: %s, From: %s, Proto: %s)", qName, dns.Type(req.Question[0].Qtype).String(), r.RemoteAddr, r.Proto)
+
+	clientIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if len(parts) > 0 {
+			clientIP = strings.TrimSpace(parts[0])
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	resp, err := h.router.Route(ctx, req)
+	resp, err := h.router.Route(ctx, req, clientIP)
 	if err != nil {
 		log.Printf("Error routing DoH query for %s: %v", qName, err)
 		resp = new(dns.Msg)

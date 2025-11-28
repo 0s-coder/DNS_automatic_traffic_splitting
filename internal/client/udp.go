@@ -25,9 +25,14 @@ func NewUDPClient(cfg config.UpstreamServer, b *resolver.Bootstrapper) *UDPClien
 }
 
 func (c *UDPClient) Resolve(ctx context.Context, req *dns.Msg) (*dns.Msg, error) {
-	host, port, err := net.SplitHostPort(c.cfg.Address)
+	rawAddr := c.cfg.Address
+	host, port, err := net.SplitHostPort(rawAddr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid address %s: %w", c.cfg.Address, err)
+		rawAddr = net.JoinHostPort(rawAddr, "53")
+		host, port, err = net.SplitHostPort(rawAddr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid address %s: %w", c.cfg.Address, err)
+		}
 	}
 
 	ip, err := c.bootstrapper.LookupIP(ctx, host)

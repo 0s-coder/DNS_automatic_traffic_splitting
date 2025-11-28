@@ -1,12 +1,13 @@
 # config.yaml.example
 
 # 服务监听配置
+# 仅需填写端口号，系统会自动处理监听地址
 listen:
-  dns_udp: ":53"
-  dns_tcp: ":53"
-  doh: ":443"
-  dot: ":853"
-  doq: ":853"
+  dns_udp: "53"
+  dns_tcp: "53"
+  doh: "443"
+  dot: "853"
+  doq: "853"
 
 # 自动证书申请 (Let's Encrypt)
 # 如果启用，server.crt 和 server.key 将被忽略，证书将自动管理。
@@ -27,29 +28,29 @@ bootstrap_dns:
 upstreams:
   cn:
     # 示例：国内UDP DNS
-    - address: "223.5.5.5:53"
+    - address: "223.5.5.5" # 自动补全为 223.5.5.5:53
       protocol: "udp"
       ecs_ip: "114.114.114.114"
     # 示例：国内DoT DNS (开启Pipelining)
-    - address: "tls://223.6.6.6:853"
+    - address: "223.6.6.6" # 自动补全为 tls://223.6.6.6:853
       protocol: "dot"
       ecs_ip: "114.114.114.114"
       pipeline: true
       insecure_skip_verify: false
   overseas:
     # 示例：海外DoH DNS (支持H3, 验证证书)
-    - address: "https://1.1.1.1/dns-query"
+    - address: "1.1.1.1" # 自动补全为 https://1.1.1.1/dns-query
       protocol: "doh"
       ecs_ip: "8.8.8.8"
       http3: true
       insecure_skip_verify: false
     # 示例：海外DoT DNS (开启Pipelining)
-    - address: "tls://8.8.8.8:853"
+    - address: "8.8.8.8" # 自动补全为 tls://8.8.8.8:853
       protocol: "dot"
       ecs_ip: "8.8.8.8"
       pipeline: true
     # 示例：海外DoQ DNS
-    - address: "quic://dns.nextdns.io:853" 
+    - address: "dns.nextdns.io" # 自动补全为 quic://dns.nextdns.io:853
       protocol: "doq"
       ecs_ip: "8.8.8.8"
 
@@ -59,6 +60,22 @@ geo_data:
   geosite_dat: "GeoSite.dat"
   geoip_download_url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"
   geosite_download_url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
+
+# Web管理界面配置
+web_ui:
+  enabled: true
+  address: ":8080" # WebUI 监听地址，例如 ":8080"
+  username: ""     # 可选：WebUI 登录用户名。若留空，则所有人拥有完全控制权。
+  password: ""     # 可选：WebUI 登录密码。若设置了账号密码，未登录用户将进入“游客模式”（只读）。
+  # cert_file: "/path/to/your/webui.crt" # 可选：WebUI TLS 证书文件路径
+  # key_file: "/path/to/your/webui.key"   # 可选：WebUI TLS 密钥文件路径
+
+# 日志配置
+query_log:
+  enabled: true
+  max_history: 5000    # 内存/UI中保留的日志条数
+  save_to_file: false  # 是否将日志持久化保存到文件
+  file: "query.log"    # 日志文件路径
 
 # 注意：
 # 自定义Hosts配置请在程序运行目录下创建 'hosts.txt' 文件。

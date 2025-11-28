@@ -16,7 +16,7 @@ func RaceResolve(ctx context.Context, req *dns.Msg, clients []DNSClient) (*dns.M
 	raceCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	results := make(chan *dns.Msg, 1)
+	results := make(chan *dns.Msg, len(clients))
 	errs := make(chan error, len(clients))
 
 	for _, c := range clients {
@@ -31,7 +31,6 @@ func RaceResolve(ctx context.Context, req *dns.Msg, clients []DNSClient) (*dns.M
 			select {
 			case results <- resp:
 			case <-raceCtx.Done():
-			default:
 			}
 		}(c)
 	}

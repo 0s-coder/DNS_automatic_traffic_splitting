@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -90,9 +91,20 @@ func (c *DoHClient) Resolve(ctx context.Context, req *dns.Msg) (*dns.Msg, error)
 	}
 
 	urlStr := c.cfg.Address
-	if strings.HasPrefix(urlStr, "https://") {
+	if !strings.HasPrefix(urlStr, "https://") && !strings.HasPrefix(urlStr, "http://") {
+		urlStr = "https://" + urlStr
+	}
+
+	if u, err := url.Parse(urlStr); err == nil {
+		if u.Path == "" || u.Path == "/" {
+			u.Path = "/dns-query"
+			urlStr = u.String()
+		}
 	} else {
-		urlStr = "https://" + strings.TrimPrefix(urlStr, "https://")
+		slashIdx := strings.Index(strings.TrimPrefix(urlStr, "https://"), "/")
+		if slashIdx == -1 {
+			urlStr += "/dns-query"
+		}
 	}
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(msgBuf))

@@ -70,3 +70,10 @@ func (s *DoTServer) Start() {
 		}
 	}()
 }
+
+func (s *DoTServer) Stop() error {
+	if s.server != nil {
+		return s.server.Shutdown()
+	}
+	return nil
+}

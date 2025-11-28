@@ -100,6 +100,10 @@ func (c *DoTClient) prepare(ctx context.Context) (string, *tls.Config, error) {
 		rawAddr = rawAddr[6:]
 	}
 
+	if _, _, err := net.SplitHostPort(rawAddr); err != nil {
+		rawAddr = net.JoinHostPort(rawAddr, "853")
+	}
+
 	host, port, err := net.SplitHostPort(rawAddr)
 	if err != nil {
 		return "", nil, fmt.Errorf("invalid address %s: %w", c.cfg.Address, err)

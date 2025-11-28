@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log"
+	"net"
 	"strings"
 	"time"
 
@@ -60,6 +61,20 @@ func (s *DNSServer) Start() {
 	}
 }
 
+func (s *DNSServer) Stop() error {
+	if s.udpServer != nil {
+		if err := s.udpServer.Shutdown(); err != nil {
+			return err
+		}
+	}
+	if s.tcpServer != nil {
+		if err := s.tcpServer.Shutdown(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type DNSRequestHandler struct {
 	router *router.Router
 }
@@ -71,12 +86,13 @@ func (h *DNSRequestHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	qName := strings.ToLower(strings.TrimSuffix(req.Question[0].Name, "."))
-	log.Printf("Received DNS query for %s (Type: %s, From: %s)", qName, dns.Type(req.Question[0].Qtype).String(), w.RemoteAddr().String())
+
+	clientIP, _, _ := net.SplitHostPort(w.RemoteAddr().String())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := h.router.Route(ctx, req)
+	resp, err := h.router.Route(ctx, req, clientIP)
 	if err != nil {
 		log.Printf("Error routing DNS query for %s: %v", qName, err)
 		dns.HandleFailed(w, req)
