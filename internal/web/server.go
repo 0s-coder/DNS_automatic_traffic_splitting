@@ -163,8 +163,13 @@ func StartWebServer(mgr *manager.ServiceManager) {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
+
+			// Return a copy of config with masked password
+			respCfg := *currentCfg
+			respCfg.WebUI.Password = "******"
+
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(currentCfg)
+			json.NewEncoder(w).Encode(respCfg)
 			return
 		}
 
@@ -178,6 +183,11 @@ func StartWebServer(mgr *manager.ServiceManager) {
 			if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
 				http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
 				return
+			}
+
+			// If password came back as masked, restore the original one
+			if newCfg.WebUI.Password == "******" {
+				newCfg.WebUI.Password = mgr.Config.WebUI.Password
 			}
 
 			configPath := config.GetDefaultConfigPath()
